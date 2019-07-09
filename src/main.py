@@ -32,20 +32,22 @@ class CsvData(object):
 
     def length(self, iterable):
         return iter(iterable).__len__
-        
-	def get_subset(self, predicate_column, predicate_expression):
+    
+	
+    def get_subset(self, predicate_column, predicate_expression):
         """
         Lazy evaluation that returns the first column for every row where the predicate equals the comparator
         :param predicate_column: column value in instance to compare
         :param predicate_expression: value to compare against predicate_column
-        :return:
+        :return: 
         """
 
         if predicate_column not in self.get_keys():
             raise KeyError
         else:
             for r in self.generate():
-                yield r if eq(r[predicate_column], predicate_expression) else {}
+                if eq(r[predicate_column], predicate_expression):
+			yield r
 
     def get_values(self, expression):
 
@@ -103,4 +105,11 @@ for d in new_orders_cnt:
 	for i,(product_id, dept_id) in enumerate(map_product_departments()):
 		if product_id == d[0]:
 			d.update(dict(department_id=dept_id))
+
+with open(root.joinpath('output','report.csv'),'w',newline='\n') as outFile:
+	field_names = ['department_id','number_of_orders','number_of_first_time_orders','percentage']
+	
+	data = [agg_orders[0],agg_orders[1],new_orders_cnt[1],{}.format('d', new_orders_cnt[1]/agg_orders[1], '7.2f')]
+	
+	
 	
