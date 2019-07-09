@@ -6,6 +6,5 @@ def get_project_root() -> Path:
     :return: Path object for project root
      """
     root = Path(__file__).parent.parent
-    
     return root
 
