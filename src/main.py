@@ -18,19 +18,22 @@ class CsvData(object):
         self.reader = DictReader(self.path.open(encoding='utf-8'))
         self.headers = self.reader.fieldnames
 
-    def generate(self):
+    def __iter__(self):
         """
         :return: DictReader object as generator
         """
         yield from self.reader
-
+    
     def get_keys(self) -> list:
         """
         :return list of column names
         """
         return self.headers
 
-    def get_subset(self, predicate_column, predicate_expression):
+    def length(self, iterable):
+        return iter(iterable).__len__
+        
+	def get_subset(self, predicate_column, predicate_expression):
         """
         Lazy evaluation that returns the first column for every row where the predicate equals the comparator
         :param predicate_column: column value in instance to compare
@@ -53,13 +56,51 @@ class CsvData(object):
                 return [row[expression] for row in self.generate()]
             except BaseException as e:
                 print(e.args, e.__traceback__)
-
-
-def summer(values):
-    if values is None:
-        raise BaseException(print('Empty list'))
-    try:
-        return dict(Counter(value for value in values))
-    except BaseException as e:
-        print(e.args, e.__traceback__)
+    
+    
+    def restart(self,reset=bool):
+        if reset:
+            self.__init__(self.fname)
         
+
+def ifilter(predicate, iterable):
+    if predicate is None:
+        predicate = bool
+    for x in iterable:
+        if predicate(x):
+            yield x
+            
+def map_product_departments():
+    """
+    Returns a sorted dictionary mapping product_id to department_id
+    """
+    products = CsvData('products.csv')
+    pd = defaultdict()
+    pd = {row['product_id']:row['department_id'] for row in products.__iter__()}
+    pd = sorted(pd.items(),key=lambda x: int(x[0]))
+    return pd
+
+def merge_join():
+	orders = CsvData('orders.csv')
+    for row in orders.__iter__():
+        for i, (k,v) in enumerate(map_product_departments()):
+            yield(ifilter(lambda x: k == x, row['product_id']), (v,row))
+            
+            
+agg_orders = defaultdict(int)
+ft = defaultdict(int)
+
+for i,(k,d) in merge_join(CsvData('orders.csv')):
+    agg_orders[k] += 1
+    
+new_orders = []
+for row in CsvData('products.csv').get_subset('reordered','0')
+	new_orders.append(row['product_id'])
+
+new_orders_cnt = dict(Counter(new_orders))
+
+for d in new_orders_cnt:
+	for i,(product_id, dept_id) in enumerate(map_product_departments()):
+		if product_id == d[0]:
+			d.update(dict(department_id=dept_id))
+	
