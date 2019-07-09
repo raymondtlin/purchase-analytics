@@ -35,7 +35,8 @@ Since Departments-Products is 1:n, we can create a lookup table between departme
             FROM products
             JOIN agg USING (product_id)
         GROUP BY 1
-        ```
+        
+ ```
 
 This is pretty intuitive in SQL, but not so much in terms of Stream Processing via Python (for me).  Especially since I don't have access to pandas, which means I had to find a way to run multiple aggregations without having to reset the generator (i.e. read from disk again).
 
