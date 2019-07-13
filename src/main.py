@@ -2,7 +2,8 @@ from csv import DictReader
 from operator import eq
 import pathlib
 from collections import *
-from utils import get_project_root
+from src.utils import get_project_root
+
 
 class CsvData(object):
     """
@@ -14,11 +15,12 @@ class CsvData(object):
         :param fname: string with file extension.
         """
         root = get_project_root()
+
         self.path = root.joinpath('input', fname)
         self.reader = DictReader(self.path.open(encoding='utf-8'))
         self.headers = self.reader.fieldnames
 
-    def __iter__(self):
+    def __iter__(self) -> object:
         """
         :return: DictReader object as generator
         """
@@ -50,9 +52,12 @@ class CsvData(object):
                 if eq(r[predicate_column], predicate_expression):
                     yield r
 
-
     def get_values(self, expression):
+        """
 
+        :param expression: field name as string
+        :return: consumes generator and returns list of values
+        """
         if expression not in self.get_keys():
             raise KeyError('Column does not exist in keys')
         else:
@@ -63,9 +68,15 @@ class CsvData(object):
 
 #   Included this as a way to re-initialize a given generator, but it is unused
 
-    def restart(self,reset=bool):
+    def restart(self, reset=bool):
+        """
+
+        :param reset: boolean
+        :return: re-initializes the class object
+        """
         if reset:
             self.__init__(self.fname)
+
 
 def ifilter(predicate, iterable):
     if predicate is None:
@@ -76,6 +87,7 @@ def ifilter(predicate, iterable):
 
 #  This function returns the product to department mapping.
 
+
 def map_product_departments():
     """
     Returns a sorted dictionary mapping product_id to department_id
@@ -85,6 +97,7 @@ def map_product_departments():
     pd = {row['product_id']:row['department_id'] for row in products.__iter__()}
     pd = sorted(pd.items(),key=lambda x: int(x[0]))
     return pd
+
 
 def merge_join():
     """
@@ -102,7 +115,7 @@ ft = defaultdict(int)
 #  Defaultdict allows us to create an aggregated table of orders by
 #  department.
 
-for i,(k,d) in merge_join():
+for i, (k, d) in merge_join():
     agg_orders[k] += 1
 
 # Couldn't solve how to filter the iterable output of the merged stream by
@@ -117,7 +130,7 @@ for row in CsvData('products.csv').get_subset('reordered','0'):
 new_orders_cnt = dict(Counter(new_orders))
 
 for d in new_orders_cnt:
-    for i,(product_id, dept_id) in enumerate(map_product_departments()):
+    for i, (product_id, dept_id) in enumerate(map_product_departments()):
         if product_id == d[0]:
             d.update(dict(department_id=dept_id))
 
