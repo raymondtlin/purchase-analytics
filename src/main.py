@@ -48,7 +48,7 @@ class CsvData(object):
         if predicate_column not in self.get_keys():
             raise KeyError
         else:
-            for r in self.generate():
+            for r in self.__iter__():
                 if eq(r[predicate_column], predicate_expression):
                     yield r
 
@@ -62,7 +62,7 @@ class CsvData(object):
             raise KeyError('Column does not exist in keys')
         else:
             try:
-                return [row[expression] for row in self.generate()]
+                return [row[expression] for row in self.__iter__()]
             except BaseException as e:
                 print(e.args, e.__traceback__)
 
@@ -94,8 +94,8 @@ def map_product_departments():
     """
     products = CsvData('products.csv')
     pd = defaultdict()
-    pd = {row['product_id']:row['department_id'] for row in products.__iter__()}
-    pd = sorted(pd.items(),key=lambda x: int(x[0]))
+    pd = {row['product_id']: row['department_id'] for row in products.__iter__()}
+    pd = sorted(pd.items(), key=lambda x: int(x[0]))
     return pd
 
 
@@ -105,8 +105,8 @@ def merge_join():
     """
     orders = CsvData('order_products.csv')
     for row in orders.__iter__():
-        for i, (k,v) in enumerate(map_product_departments()):
-            yield(ifilter(lambda x: k == x, row['product_id']), (v,row))
+        for i, (k, v) in enumerate(map_product_departments()):
+            yield(ifilter(lambda x: k == x, row['product_id']), (v, row))
 
 
 agg_orders = defaultdict(int)
@@ -134,7 +134,7 @@ for d in new_orders_cnt:
         if product_id == d[0]:
             d.update(dict(department_id=dept_id))
 
-with open(root.joinpath('output','report.csv'),'w',newline='\n') as outFile:
-    field_names = ['department_id','number_of_orders','number_of_first_time_orders','percentage']
-    data = [agg_orders[0],agg_orders[1],new_orders_cnt[1],{}.format('d',
-new_orders_cnt[1]/agg_orders[1], '.2f')]
+
+with open(root.joinpath('output', 'report.csv'), 'w', newline='\n') as outFile:
+    field_names = ['department_id', 'number_of_orders', 'number_of_first_time_orders', 'percentage']
+    data = [agg_orders[0], agg_orders[1], new_orders_cnt[1], {}.format('d', new_orders_cnt[1]/agg_orders[1], '.2f')]
