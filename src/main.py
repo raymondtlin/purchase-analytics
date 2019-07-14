@@ -55,28 +55,44 @@ def create_lookup(obj, key, val):
     :param val: field in obj
     :return: ordered mapping
     """
-    cols = [key, val]
+    cols = {key, val}
 
     if not isinstance(obj, Csv):
         raise TypeError('obj argument is not an instance of Csv')
     else:
-        if len(obj.fields & cols) < 2:
-            raise LookupError('Unable to find argument(s):{}'.format(i for i in {cols - obj.fields}))
+        if len({obj.fields} & cols) < 2:
+            raise LookupError('Unable to find argument(s):{}'.format(i for i in {cols - {obj.fields}}))
         else:
             d = {getattr(t, key): getattr(t, val) for t in obj.parse_record()}
             return dict(sorted(d.items(), key=lambda x: int(x[0])))
 
-    assert len(cols & obj.fields) == 2
+    assert len(cols & {obj.fields}) == 2
     assert isinstance(obj, Csv)
 
-def merge_join():
+
+def lookup_merge(obj, lkp, on=""):
     """
-    Returns an iterable with a SQL-esque join on product_id between the two streams.
+    Generates a merged dictionary by looking up the corresponding key's value in a dictionary
+    :param obj: instance of Csv
+    :param lkp: mapping of key:value
+    :param on: shared column in both obj and lkp
+    :return: merged dict
     """
-    orders = CsvData('order_products.csv')
-    for row in orders.__iter__():
-        for i, (k, v) in enumerate(map_product_departments()):
-            yield(ifilter(lambda x: k == x, row['product_id']), (v, row))
+    if isinstance(lkp, dict):
+        for record in obj.parse_record():
+            record_dict = record._asdict()
+            try:
+                lkp_dict = dict(dept_id=lkp.get(getattr(record, on)))
+            except LookupError as e:
+                print(e.args, e.__annotations__)
+            finally:
+                yield {**record_dict, **lkp_dict}
+    else:
+        raise TypeError('Value passed into lkp argument is not a dictionary.')
+
+    assert isinstance(obj, Csv)
+    assert isinstance(lkp, dict)
+    assert on in lkp.keys()
 
 
 agg_orders = defaultdict(int)
