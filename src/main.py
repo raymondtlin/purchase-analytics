@@ -47,26 +47,27 @@ class Csv(object):
             yield row
 
 
-def ifilter(predicate, iterable):
-    if predicate is None:
-        predicate = bool
-    for x in iterable:
-        if predicate(x):
-            yield x
-
-#  This function returns the product to department mapping.
-
-
-def map_product_departments():
+def create_lookup(obj, key, val):
     """
-    Returns a sorted dictionary mapping product_id to department_id
+    Creates a mapping between a key and value from the given instance object
+    :param obj: instance of Csv class
+    :param key: field in obj
+    :param val: field in obj
+    :return: ordered mapping
     """
-    products = CsvData('products.csv')
-    pd = defaultdict()
-    pd = {row['product_id']: row['department_id'] for row in products.__iter__()}
-    pd = sorted(pd.items(), key=lambda x: int(x[0]))
-    return pd
+    cols = [key, val]
 
+    if not isinstance(obj, Csv):
+        raise TypeError('obj argument is not an instance of Csv')
+    else:
+        if len(obj.fields & cols) < 2:
+            raise LookupError('Unable to find argument(s):{}'.format(i for i in {cols - obj.fields}))
+        else:
+            d = {getattr(t, key): getattr(t, val) for t in obj.parse_record()}
+            return dict(sorted(d.items(), key=lambda x: int(x[0])))
+
+    assert len(cols & obj.fields) == 2
+    assert isinstance(obj, Csv)
 
 def merge_join():
     """
