@@ -1,81 +1,50 @@
-from csv import DictReader
-from operator import eq
-import pathlib
-from collections import *
-from src.utils import get_project_root
+from collections import defaultdict, namedtuple, Counter
+from csv import reader
+from pathlib import PosixPath
 
 
-class CsvData(object):
+class Csv(object):
     """
-    Container for DictReader objects
+    Iterable container which generates named tuples for each read row from a CSV file
+
+    Attributes:
+        file_path (PosixPath): posix-path object for file to read
+        reader (Reader): csv.reader object iterable
+        fields (list):  list of column names
     """
-    def __init__(self, fname):
-        """
-        Instantiates a DictReader object from the specified filename.
-        :param fname: string with file extension.
-        """
-        root = get_project_root()
 
-        self.path = root.joinpath('input', fname)
-        self.reader = DictReader(self.path.open(encoding='utf-8'))
-        self.headers = self.reader.fieldnames
+    def __init__(self, file_path):
+        """
+        Constructor for Csv class
+        :param file_path: pathlib.PosixPath object specifying file to read
+        """
+        self.file_path = file_path
 
-    def __iter__(self) -> object:
-        """
-        :return: DictReader object as generator
-        """
+        # Sanitizing input, if the parameter object is PosixPath, we can use pathlib.open \
+        # If not, we will use vanilla open
+
+        if isinstance(self.file_path, PosixPath):
+            self.reader = reader(self.file_path.open())
+        else:
+            self.reader = reader(open(file_path.as_posix(), 'r'))
+
+        self.fields = list(next(self.reader))
+
+    def __iter__(self):
+        self._length = 0
+        self._counter = Counter()
+
         yield from self.reader
 
-    def get_keys(self) -> list:
+    def parse_record(self):
         """
-        :return list of column names
+        Returns single row entry as a named tuple
+        :return: named tuple for a single row
         """
-        return self.headers
+        Record = namedtuple('Record_', self.fields)
 
-#   This and the following method were initially included as a way to access
-#   columns in the stream.  But since we're using DictReader, they're
-#   usefulness is a bit moot.
-
-
-    def get_subset(self, predicate_column, predicate_expression):
-        """
-        Lazy evaluation that returns the first column for every row where the predicate equals the comparator
-        :param predicate_column: column value in instance to compare
-        :param predicate_expression: value to compare against predicate_column
-        :return: a list of column values
-        """
-
-        if predicate_column not in self.get_keys():
-            raise KeyError
-        else:
-            for r in self.__iter__():
-                if eq(r[predicate_column], predicate_expression):
-                    yield r
-
-    def get_values(self, expression):
-        """
-
-        :param expression: field name as string
-        :return: consumes generator and returns list of values
-        """
-        if expression not in self.get_keys():
-            raise KeyError('Column does not exist in keys')
-        else:
-            try:
-                return [row[expression] for row in self.__iter__()]
-            except BaseException as e:
-                print(e.args, e.__traceback__)
-
-#   Included this as a way to re-initialize a given generator, but it is unused
-
-    def restart(self, reset=bool):
-        """
-
-        :param reset: boolean
-        :return: re-initializes the class object
-        """
-        if reset:
-            self.__init__(self.fname)
+        for row in map(Record._make, self.reader):
+            yield row
 
 
 def ifilter(predicate, iterable):
