@@ -2,6 +2,8 @@ from collections import defaultdict, namedtuple, Counter
 from csv import reader
 from pathlib import PosixPath
 
+from src.utils import get_project_root
+
 
 class Csv(object):
     """
@@ -60,21 +62,22 @@ def create_lookup(obj, key, val):
     if not isinstance(obj, Csv):
         raise TypeError('obj argument is not an instance of Csv')
     else:
-        if len({obj.fields} & cols) < 2:
-            raise LookupError('Unable to find argument(s):{}'.format(i for i in {cols - {obj.fields}}))
+        if len(set(obj.fields) & cols) < 2:
+            raise LookupError('Unable to find argument(s):{}'.format(i for i in {cols - set(obj.fields)}))
         else:
             d = {getattr(t, key): getattr(t, val) for t in obj.parse_record()}
             return dict(sorted(d.items(), key=lambda x: int(x[0])))
 
-    assert len(cols & {obj.fields}) == 2
+    assert len(cols & set(obj.fields)) == 2
     assert isinstance(obj, Csv)
 
 
-def lookup_merge(obj, lkp, on=""):
+def lookup_merge(obj, lkp, lkp_value, on=""):
     """
     Generates a merged dictionary by looking up the corresponding key's value in a dictionary
     :param obj: instance of Csv
     :param lkp: mapping of key:value
+    :param lkp_value: name for value to merge
     :param on: shared column in both obj and lkp
     :return: merged dict
     """
@@ -82,7 +85,7 @@ def lookup_merge(obj, lkp, on=""):
         for record in obj.parse_record():
             record_dict = record._asdict()
             try:
-                lkp_dict = dict(dept_id=lkp.get(getattr(record, on)))
+                lkp_dict = dict(lkp_value=lkp.get(getattr(record, on)))
             except LookupError as e:
                 print(e.args, e.__annotations__)
             finally:
@@ -93,6 +96,31 @@ def lookup_merge(obj, lkp, on=""):
     assert isinstance(obj, Csv)
     assert isinstance(lkp, dict)
     assert on in lkp.keys()
+
+
+# Get project root as Pathlib.path
+
+rd = get_project_root()
+
+# Create paths to instantiate Csv objects
+op_file = rd.joinpath('input', 'order_products.csv')
+pd_file = rd.joinpath('input', 'products.csv')
+
+# Instantiate the Csv objects
+orders = Csv(op_file)
+products = Csv(pd_file)
+
+# Create mapping dict between product_id : department_id
+dept_lkp = create_lookup(products, 'product_id', 'department_id')
+
+merged = lookup_merge(orders, dept_lkp, 'department_id', on='product_id')
+
+for row in merged:
+    dict(department_id=row[department_id],
+         num_of_orders=count(row['department_id']),
+         number_of_first_orders=1 - row['reordered'],
+         percentage=format((1 - row['reordered']) / count(row['department_id']), 'd', 2)
+         )
 
 
 agg_orders = defaultdict(int)
