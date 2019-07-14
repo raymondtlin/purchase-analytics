@@ -1,5 +1,5 @@
-from collections import defaultdict, namedtuple, Counter
-from csv import reader
+from collections import deque, namedtuple, Counter
+from csv import reader, writer
 from pathlib import PosixPath
 
 from src.utils import get_project_root
@@ -72,7 +72,7 @@ def create_lookup(obj, key, val):
     assert isinstance(obj, Csv)
 
 
-def lookup_merge(obj, lkp, lkp_value, on=""):
+def lookup_merge(obj, lkp, lkp_value, on):
     """
     Generates a merged dictionary by looking up the corresponding key's value in a dictionary
     :param obj: instance of Csv
@@ -85,7 +85,7 @@ def lookup_merge(obj, lkp, lkp_value, on=""):
         for record in obj.parse_record():
             record_dict = record._asdict()
             try:
-                lkp_dict = dict(lkp_value=lkp.get(getattr(record, on)))
+                lkp_dict = dict({lkp_value: lkp.get(getattr(record, on))})
             except LookupError as e:
                 print(e.args, e.__annotations__)
             finally:
@@ -95,7 +95,6 @@ def lookup_merge(obj, lkp, lkp_value, on=""):
 
     assert isinstance(obj, Csv)
     assert isinstance(lkp, dict)
-    assert on in lkp.keys()
 
 
 # Get project root as Pathlib.path
@@ -106,49 +105,40 @@ rd = get_project_root()
 op_file = rd.joinpath('input', 'order_products.csv')
 pd_file = rd.joinpath('input', 'products.csv')
 
-# Instantiate the Csv objects
-orders = Csv(op_file)
-products = Csv(pd_file)
-
 # Create mapping dict between product_id : department_id
+products = Csv(pd_file)
 dept_lkp = create_lookup(products, 'product_id', 'department_id')
 
+# Instantiate the Csv objects
+orders = Csv(op_file)
 merged = lookup_merge(orders, dept_lkp, 'department_id', on='product_id')
 
+# initialize containers for Aggregates
+dq_orders = deque()
+dq_ft_orders = deque()
+dql = list()
+dct = {}
+
 for row in merged:
-    dict(department_id=row[department_id],
-         num_of_orders=count(row['department_id']),
-         number_of_first_orders=1 - row['reordered'],
-         percentage=format((1 - row['reordered']) / count(row['department_id']), 'd', 2)
-         )
+    dq_orders.append(row['department_id'])
+    if row['reordered'] == '0':
+        dq_ft_orders.append(row['department_id'])
+
+for x in map(Counter, [dq_orders, dq_ft_orders]):
+    dql.append(dict(x))
+
+for k in dql[0].keys():
+    dct[k] = tuple(d[k] for d in dql)
+
+out_headers = ('department_id', 'number_of_orders', 'number_of_first_time_orders', 'percentage')
 
 
-agg_orders = defaultdict(int)
-ft = defaultdict(int)
-
-#  Defaultdict allows us to create an aggregated table of orders by
-#  department.
-
-for i, (k, d) in merge_join():
-    agg_orders[k] += 1
-
-# Couldn't solve how to filter the iterable output of the merged stream by
-# "reordered" so I decided aggregate new orders by product_id, and then join
-#  department_id to product_id and sum(count) by department_id.  The sum part
-#  is still missing however.
-
-new_orders = []
-for row in CsvData('products.csv').get_subset('reordered','0'):
-    new_orders.append(row['product_id'])
-
-new_orders_cnt = dict(Counter(new_orders))
-
-for d in new_orders_cnt:
-    for i, (product_id, dept_id) in enumerate(map_product_departments()):
-        if product_id == d[0]:
-            d.update(dict(department_id=dept_id))
+def csv_write(fname, headers, data):
+    with rd.joinpath('output', fname).open('w', newline='\n') as csv:
+        w = writer(csv, delimiter=',', lineterminator='\n')
+        w.writerow(headers)
+        for i, (k, v) in enumerate(sorted(data.items(), key=lambda x: int(x[0]))):
+            w.writerow(tuple((k, v[0], v[1], '{:.2f}'.format(v[1] / v[0]))))
 
 
-with open(root.joinpath('output', 'report.csv'), 'w', newline='\n') as outFile:
-    field_names = ['department_id', 'number_of_orders', 'number_of_first_time_orders', 'percentage']
-    data = [agg_orders[0], agg_orders[1], new_orders_cnt[1], {}.format('d', new_orders_cnt[1]/agg_orders[1], '.2f')]
+csv_write('report.csv', out_headers, dct)
