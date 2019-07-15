@@ -2,7 +2,7 @@ from collections import deque, namedtuple, Counter
 from csv import reader, writer
 from pathlib import PosixPath
 
-from src.utils import get_project_root
+from utils import get_project_root
 
 
 class Csv(object):
@@ -36,7 +36,7 @@ class Csv(object):
         self._length = 0
         self._counter = Counter()
 
-        yield from self.reader
+        yield self.reader
 
     def parse_record(self):
         """
@@ -97,48 +97,76 @@ def lookup_merge(obj, lkp, lkp_value, on):
     assert isinstance(lkp, dict)
 
 
-# Get project root as Pathlib.path
-
-rd = get_project_root()
-
-# Create paths to instantiate Csv objects
-op_file = rd.joinpath('input', 'order_products.csv')
-pd_file = rd.joinpath('input', 'products.csv')
-
-# Create mapping dict between product_id : department_id
-products = Csv(pd_file)
-dept_lkp = create_lookup(products, 'product_id', 'department_id')
-
-# Instantiate the Csv objects
-orders = Csv(op_file)
-merged = lookup_merge(orders, dept_lkp, 'department_id', on='product_id')
-
-# initialize containers for Aggregates
-dq_orders = deque()
-dq_ft_orders = deque()
-dql = list()
-dct = {}
-
-for row in merged:
-    dq_orders.append(row['department_id'])
-    if row['reordered'] == '0':
-        dq_ft_orders.append(row['department_id'])
-
-for x in map(Counter, [dq_orders, dq_ft_orders]):
-    dql.append(dict(x))
-
-for k in dql[0].keys():
-    dct[k] = tuple(d[k] for d in dql)
-
-out_headers = ('department_id', 'number_of_orders', 'number_of_first_time_orders', 'percentage')
-
-
 def csv_write(fname, headers, data):
-    with rd.joinpath('output', fname).open('w', newline='\n') as csv:
-        w = writer(csv, delimiter=',', lineterminator='\n')
-        w.writerow(headers)
-        for i, (k, v) in enumerate(sorted(data.items(), key=lambda x: int(x[0]))):
-            w.writerow(tuple((k, v[0], v[1], '{:.2f}'.format(v[1] / v[0]))))
+    """
+    Writes data to csv file
+    :param fname: string
+    :param headers: iterable of strings
+    :param data: iterable
+    """
+    if fname is not None:
+        with rd.joinpath('output', fname).open('w', newline='\n') as csv:
+            w = writer(csv, delimiter=',', lineterminator='\n')
+            w.writerow(headers)
+            for i, (k, v) in enumerate(sorted(data.items(), key=lambda x: int(x[0]))):
+                w.writerow(tuple((k, v[0], v[1], '{:.2f}'.format(v[1] / v[0]))))
+    else:
+        raise ValueError('File name is not specified')
+
+    assert len(fname) > 0
+    assert data is not None
 
 
-csv_write('report.csv', out_headers, dct)
+if __name__ == '__main__':
+
+    # Get project root as Pathlib.path
+
+    rd = get_project_root()
+
+    # Create paths to instantiate Csv objects
+    op_file = rd.joinpath('input', 'order_products.csv')
+    pd_file = rd.joinpath('input', 'products.csv')
+
+    # Create mapping dict between product_id : department_id
+    products = Csv(pd_file)
+    dept_lkp = create_lookup(products, 'product_id', 'department_id')
+
+    # Instantiate the Csv objects
+    orders = Csv(op_file)
+    merged = lookup_merge(orders, dept_lkp, 'department_id', on='product_id')
+
+    # Initialize containers for Aggregates
+    # The deques will store department_ids; these objects will be wrapped with Counter
+    dq_orders = deque()
+    dq_ft_orders = deque()
+
+    dql = list()
+    dct = {}
+
+    # Generator consumption
+    # As we generate each merged row, we store the value of department_id in dq_orders
+    # If reordered == 0 then we store department_id in dq_ft_orders
+
+    # On the order_products__train dataset, sys.getsizeof(dq_orders) = ~11MB
+
+    for row in merged:
+
+        dq_orders.append(row['department_id'])
+        if row['reordered'] == '0':
+            dq_ft_orders.append(row['department_id'])
+
+    # Once the generators are exhausted we turn the deques into Counter objects
+    for x in map(Counter, [dq_orders, dq_ft_orders]):
+        dql.append(dict(x))
+
+    # After the previous loop, we have two dicts with { department_id : int }
+    # This loop combines the two dicts into one
+    for k in dql[0].keys():
+        dct[k] = tuple(d[k] for d in dql)
+
+    out_headers = ('department_id', 'number_of_orders', 'number_of_first_time_orders', 'percentage')
+
+    # call write method
+    csv_write('report.csv', out_headers, dct)
+
+    print('File has written to {}'.format(rd.joinpath('output')))
