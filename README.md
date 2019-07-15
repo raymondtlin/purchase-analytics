@@ -1,5 +1,6 @@
 # purchase-analytics
 
+Insight Fellows Data Engineering Coding Challenge Submission
 ## Methodology
 
 Production-level code generally indicates that resources will be a constraint, particularly memory given scarcity (relative to CPU 
